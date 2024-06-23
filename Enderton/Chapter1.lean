@@ -172,3 +172,24 @@ theorem WFF.exercise2 (n : Nat) (h0 : n ≠ 0) (h2 : n ≠ 2) (h3 : n ≠ 3) (h6
   . intro h
     refine WFF.after_six n ?h'
     exact Nat.gt_of_not_le h
+
+def WFF.numberOfBinaryConnectives : WFF → Nat
+  | WFF.SentenceSymbol _ => 0
+  | WFF.Not α => α.numberOfBinaryConnectives
+  | WFF.BinOp _ α β => 1 + α.numberOfBinaryConnectives + β.numberOfBinaryConnectives
+
+def WFF.numberOfSentenceSymbols : WFF → Nat
+  | WFF.SentenceSymbol _ => 1
+  | WFF.Not α => α.numberOfSentenceSymbols
+  | WFF.BinOp _ α β => α.numberOfSentenceSymbols + β.numberOfSentenceSymbols
+
+theorem WFF.exercise3 (w : WFF) : w.numberOfSentenceSymbols = w.numberOfBinaryConnectives + 1 := by
+  induction w with
+  | SentenceSymbol _ =>
+    rw [WFF.numberOfBinaryConnectives, WFF.numberOfSentenceSymbols]
+  | Not α ihα =>
+    rw [WFF.numberOfBinaryConnectives, WFF.numberOfSentenceSymbols]
+    exact ihα
+  | BinOp _ α β ihα ihβ =>
+    rw [WFF.numberOfBinaryConnectives, WFF.numberOfSentenceSymbols]
+    omega
