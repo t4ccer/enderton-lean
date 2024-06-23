@@ -1,4 +1,5 @@
 import Mathlib.Data.Nat.Defs
+import Mathlib.Algebra.Parity
 
 inductive BinOp where
   | And
@@ -193,3 +194,55 @@ theorem WFF.exercise3 (w : WFF) : w.numberOfSentenceSymbols = w.numberOfBinaryCo
   | BinOp _ α β ihα ihβ =>
     rw [WFF.numberOfBinaryConnectives, WFF.numberOfSentenceSymbols]
     omega
+
+def WFF.hasNoNegationB : WFF → Bool
+  | WFF.SentenceSymbol _ => true
+  | WFF.Not _ => false
+  | WFF.BinOp _ α β => α.hasNoNegationB && β.hasNoNegationB
+
+def WFF.hasNoNegation (w : WFF) : Prop := w.hasNoNegationB = true
+
+def and_left : ((a && b) = true) → (a = true) := by
+  intro h
+  rw [and] at h
+  refine @by_cases (a = true) _ ?_ ?_
+  . intro h'
+    exact h'
+  . intro h'
+    simp at h'
+    rw [h'] at h
+    simp at h
+
+def and_right : ((a && b) = true) → (b = true) := by
+  intro h
+  rw [Bool.and_comm] at h
+  exact and_left h
+
+def WFF.hasNoNegationBinOp {α β : WFF} (h : (WFF.BinOp op α β).hasNoNegation)
+  : α.hasNoNegation ∧ β.hasNoNegation := by
+  rw [hasNoNegation, hasNoNegationB] at h
+  have hα := and_left h
+  have hβ := and_right h
+  exact { left := hα, right := hβ }
+
+def WFF.hasNoNegationNot {α : WFF} (h : (WFF.Not α).hasNoNegation) : False := by 
+  rw [hasNoNegation, hasNoNegationB] at h
+  absurd h
+  simp
+
+theorem WFF.exercise5a (w : WFF) (h : w.hasNoNegation) : Odd (w.length) := by
+  induction w with
+  | SentenceSymbol _ =>
+    rw [length, Odd]
+    exists 0
+  | Not α _ =>
+    exact (WFF.hasNoNegationNot h).elim
+  | BinOp _ α β ihα ihβ =>
+    rw [length]
+    have ⟨hα, hβ⟩ := WFF.hasNoNegationBinOp h
+    have hoα := ihα hα
+    have hoβ := ihβ hβ
+    rw [Nat.add_assoc, Nat.add_comm]
+    have hl := Odd.add_odd hoα hoβ
+    refine Even.add_odd hl ?three_is_odd
+    exists 1
