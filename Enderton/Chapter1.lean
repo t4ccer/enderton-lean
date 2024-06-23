@@ -166,7 +166,7 @@ theorem WFF.before_six (n : Nat) (h0 : n ≠ 0) (h2 : n ≠ 2) (h3 : n ≠ 3) (h
   | 5 => exact WFF.length_five
   | 6 => omega
 
-theorem WFF.exercise2 (n : Nat) (h0 : n ≠ 0) (h2 : n ≠ 2) (h3 : n ≠ 3) (h6 : n ≠ 6) : ∃ (w : WFF), w.length = n := by
+theorem WFF.section1_exercise2 (n : Nat) (h0 : n ≠ 0) (h2 : n ≠ 2) (h3 : n ≠ 3) (h6 : n ≠ 6) : ∃ (w : WFF), w.length = n := by
   apply @by_cases (n ≤ 6) _ ?_ ?_
   . intro h
     exact WFF.before_six n h0 h2 h3 h6 h
@@ -184,7 +184,7 @@ def WFF.numberOfSentenceSymbols : WFF → Nat
   | WFF.Not α => α.numberOfSentenceSymbols
   | WFF.BinOp _ α β => α.numberOfSentenceSymbols + β.numberOfSentenceSymbols
 
-theorem WFF.exercise3 (w : WFF) : w.numberOfSentenceSymbols = w.numberOfBinaryConnectives + 1 := by
+theorem WFF.section1_exercise3 (w : WFF) : w.numberOfSentenceSymbols = w.numberOfBinaryConnectives + 1 := by
   induction w with
   | SentenceSymbol _ =>
     rw [WFF.numberOfBinaryConnectives, WFF.numberOfSentenceSymbols]
@@ -206,8 +206,7 @@ def and_left : ((a && b) = true) → (a = true) := by
   intro h
   rw [and] at h
   refine @by_cases (a = true) _ ?_ ?_
-  . intro h'
-    exact h'
+  . exact fun a ↦ a
   . intro h'
     simp at h'
     rw [h'] at h
@@ -218,31 +217,61 @@ def and_right : ((a && b) = true) → (b = true) := by
   rw [Bool.and_comm] at h
   exact and_left h
 
-def WFF.hasNoNegationBinOp {α β : WFF} (h : (WFF.BinOp op α β).hasNoNegation)
+def WFF.BinOp_hasNoNegation {α β : WFF} (h : (WFF.BinOp op α β).hasNoNegation)
   : α.hasNoNegation ∧ β.hasNoNegation := by
   rw [hasNoNegation, hasNoNegationB] at h
   have hα := and_left h
   have hβ := and_right h
   exact { left := hα, right := hβ }
 
-def WFF.hasNoNegationNot {α : WFF} (h : (WFF.Not α).hasNoNegation) : False := by 
+def WFF.Not_hasNoNegation {α : WFF} (h : (WFF.Not α).hasNoNegation) : False := by
   rw [hasNoNegation, hasNoNegationB] at h
   absurd h
   simp
 
-theorem WFF.exercise5a (w : WFF) (h : w.hasNoNegation) : Odd (w.length) := by
+theorem WFF.length_if_hasNoNegation (w : WFF) (h : w.hasNoNegation) : ∃ k, w.length = 4 * k + 1 := by
   induction w with
   | SentenceSymbol _ =>
-    rw [length, Odd]
+    rw [length]
     exists 0
-  | Not α _ =>
-    exact (WFF.hasNoNegationNot h).elim
+  | Not _ _ =>
+    exact (WFF.Not_hasNoNegation h).elim
   | BinOp _ α β ihα ihβ =>
     rw [length]
-    have ⟨hα, hβ⟩ := WFF.hasNoNegationBinOp h
+    have ⟨hα, hβ⟩ := WFF.BinOp_hasNoNegation h
     have hoα := ihα hα
     have hoβ := ihβ hβ
-    rw [Nat.add_assoc, Nat.add_comm]
-    have hl := Odd.add_odd hoα hoβ
-    refine Even.add_odd hl ?three_is_odd
-    exists 1
+    have ⟨kα, hkα⟩ := hoα
+    have ⟨kβ, hkβ⟩ := hoβ
+    rw [Nat.add_assoc, Nat.add_comm, hkα, hkβ]
+    exists kα + kβ + 1
+    omega
+
+theorem WFF.section1_exercise5a (w : WFF) (h : w.hasNoNegation) : Odd (w.length) := by
+  have ⟨l, hl⟩ := WFF.length_if_hasNoNegation w h
+  rw [hl]
+  exists 2 * l
+  omega
+
+theorem WFF.section1_exercise5b
+  {k : Nat} (w : WFF) (h_neg : w.hasNoNegation) (h_len : w.length = 4 * k + 1)
+  : w.numberOfSentenceSymbols = k + 1 := by
+  induction w generalizing k with
+  | SentenceSymbol _ =>
+    rw [numberOfSentenceSymbols]
+    rw [length] at h_len
+    have k0 : k = 0 := by omega
+    rw [k0]
+  | Not _ _ =>
+    exact (WFF.Not_hasNoNegation h_neg).elim
+  | BinOp _ α β ihα ihβ =>
+    have ⟨hα, hβ⟩ := WFF.BinOp_hasNoNegation h_neg
+    have ⟨kα, hkα⟩ := WFF.length_if_hasNoNegation α hα
+    have ⟨kβ, hkβ⟩ := WFF.length_if_hasNoNegation β hβ
+    rw [length, hkα, hkβ] at h_len
+    rw [hkα] at ihα
+    rw [hkβ] at ihβ
+    have noss_α : numberOfSentenceSymbols α = kα + 1 := ihα hα rfl
+    have noss_β : numberOfSentenceSymbols β = kβ + 1 := ihβ hβ rfl
+    rw [numberOfSentenceSymbols, noss_α, noss_β]
+    omega
