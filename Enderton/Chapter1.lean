@@ -278,3 +278,36 @@ theorem WFF.section1_exercise5b {n : Nat} {k : Nat} (w : WFF n) (h_neg : w.hasNo
     have noss_β : numberOfSentenceSymbols β = kβ + 1 := ihβ hβ rfl
     rw [numberOfSentenceSymbols, noss_α, noss_β]
     omega
+
+def WFF.eval {n : Nat} (w : WFF n) (v : Fin n → Bool) : Bool :=
+  match w with
+  | WFF.SentenceSymbol var => v var
+  | WFF.Not α => !(WFF.eval α v)
+  | WFF.BinOp BinOp.And α β => (WFF.eval α v) && (WFF.eval β v)
+  | WFF.BinOp BinOp.Or α β => (WFF.eval α v) || (WFF.eval β v)
+  | WFF.BinOp BinOp.Impl α β => !((WFF.eval α v) && !(WFF.eval β v))
+  | WFF.BinOp BinOp.Iff α β => (WFF.eval α v) == (WFF.eval β v)
+
+theorem WFF.section2_exercise6a {n : Nat} (w : WFF n) (v1 : Fin n → Bool) (v2 : Fin n → Bool) (h : ∀ (x : Fin n), v1 x = v2 x)
+  : eval w v1 = eval w v2 := by
+  induction w with
+  | SentenceSymbol var =>
+    rw [eval, eval]
+    exact h var
+  | Not α ih =>
+    rw [eval, eval]
+    exact congrArg not ih
+  | BinOp op α β ihα ihβ =>
+    match op with
+    | BinOp.And =>
+      rw [eval, eval]
+      exact congr (congrArg and ihα) ihβ
+    | BinOp.Or =>
+      rw [eval, eval]
+      exact congr (congrArg or ihα) ihβ
+    | BinOp.Impl =>
+      rw [eval, eval, Bool.not_and, Bool.not_and]
+      exact congr (congrArg or (congrArg not ihα)) (congrArg not (congrArg not ihβ))
+    | BinOp.Iff =>
+      rw [eval, eval]
+      exact congr (congrArg BEq.beq ihα) ihβ
