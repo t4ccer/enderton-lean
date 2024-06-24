@@ -7,12 +7,12 @@ inductive BinOp where
   | Iff
   | Impl
 
-inductive WFF where
-  | SentenceSymbol : Nat → WFF
-  | Not : (α : WFF) → WFF
-  | BinOp : BinOp → (α : WFF) → (β : WFF) → WFF
+inductive WFF (n : Nat) where
+  | SentenceSymbol : Fin n → WFF n
+  | Not : (α : WFF n) → WFF n
+  | BinOp : BinOp → (α : WFF n) → (β : WFF n) → WFF n
 
-def WFF.reprAux : WFF → Lean.Format
+def WFF.reprAux {n : Nat} : WFF n → Lean.Format
   | WFF.SentenceSymbol n => "A" ++ reprPrec n 0
   | WFF.Not α => "(¬" ++ α.reprAux ++ ")"
   | WFF.BinOp BinOp.Impl α β => "(" ++ α.reprAux ++ " → " ++ β.reprAux ++ ")"
@@ -20,7 +20,7 @@ def WFF.reprAux : WFF → Lean.Format
   | WFF.BinOp BinOp.Or α β => "(" ++ α.reprAux ++ " ∨ " ++ β.reprAux ++ ")"
   | WFF.BinOp BinOp.And α β => "(" ++ α.reprAux ++ " ∧ " ++ β.reprAux ++ ")"
 
-instance : Repr WFF where
+instance : Repr (WFF n) where
   reprPrec wff _ := wff.reprAux
 
 inductive Symbol where
@@ -30,17 +30,17 @@ inductive Symbol where
   | BinOp : BinOp → Symbol
   | Not
 
-def WFF.toSymbols : WFF → List Symbol
+def WFF.toSymbols {n : Nat} : WFF n → List Symbol
   | WFF.SentenceSymbol n => [Symbol.SentenceSymbol n]
   | WFF.Not α => [Symbol.LeftParen, Symbol.Not] ++ α.toSymbols ++ [Symbol.RightParen]
   | WFF.BinOp op α β => [Symbol.LeftParen] ++ α.toSymbols ++ [Symbol.BinOp op] ++ β.toSymbols ++ [Symbol.RightParen]
 
-def WFF.length : WFF → Nat
+def WFF.length {n : Nat} : WFF n → Nat
   | SentenceSymbol _ => 1
   | Not α => 3 + α.length
   | BinOp _ α β => 3 + α.length + β.length
 
-def WFF.toSymbols_length_eq_length (w : WFF) : w.toSymbols.length = w.length := by
+def WFF.toSymbols_length_eq_length {n : Nat} (w : WFF n) : w.toSymbols.length = w.length := by
   induction w with
   | SentenceSymbol _ => rfl
   | Not α ihα =>
@@ -50,7 +50,7 @@ def WFF.toSymbols_length_eq_length (w : WFF) : w.toSymbols.length = w.length := 
     simp [length, toSymbols]
     omega
 
-theorem WFF.zero_le_length (w : WFF) : 0 < w.length := by
+theorem WFF.zero_le_length {n : Nat} (w : WFF n) : 0 < w.length := by
   match w with
   | SentenceSymbol _ =>
     rw [length]
@@ -62,7 +62,7 @@ theorem WFF.zero_le_length (w : WFF) : 0 < w.length := by
     rw [length]
     omega
 
-theorem WFF.length_not_zero (w : WFF) : w.length ≠ 0 := by
+theorem WFF.length_not_zero {n : Nat} (w : WFF n) : w.length ≠ 0 := by
   match w with
   | SentenceSymbol _ => exact Nat.ne_of_beq_eq_false rfl
   | Not _ =>
@@ -72,10 +72,10 @@ theorem WFF.length_not_zero (w : WFF) : w.length ≠ 0 := by
     rw [length]
     omega
 
-theorem WFF.length_one : ∃ (w : WFF), w.length = 1 := by
-  exists WFF.SentenceSymbol 0
+theorem WFF.length_one {n : Nat} (hn : 0 < n) : ∃ (w : WFF n), w.length = 1 := by
+  exists WFF.SentenceSymbol ⟨0, hn⟩
 
-theorem WFF.length_not_two (w : WFF) : w.length ≠ 2 := by
+theorem WFF.length_not_two {n : Nat} (w : WFF n) : w.length ≠ 2 := by
   match w with
   | SentenceSymbol _ => exact Nat.ne_of_beq_eq_false rfl
   | Not _ =>
@@ -85,7 +85,7 @@ theorem WFF.length_not_two (w : WFF) : w.length ≠ 2 := by
     rw [length, Nat.add_assoc]
     omega
 
-theorem WFF.length_not_three (w : WFF) : w.length ≠ 3 := by
+theorem WFF.length_not_three {n : Nat} (w : WFF n) : w.length ≠ 3 := by
   match w with
   | SentenceSymbol _ =>
     rw [length]
@@ -99,13 +99,13 @@ theorem WFF.length_not_three (w : WFF) : w.length ≠ 3 := by
     have h := WFF.zero_le_length α
     omega
 
-theorem WFF.length_four : ∃ (w : WFF), w.length = 4 := by
-  exists WFF.Not (WFF.SentenceSymbol 0)
+theorem WFF.length_four {n : Nat} (hn : 0 < n) : ∃ (w : WFF n), w.length = 4 := by
+  exists WFF.Not (WFF.SentenceSymbol ⟨0, hn⟩)
 
-theorem WFF.length_five : ∃ (w : WFF), w.length = 5 := by
-  exists WFF.BinOp BinOp.And (WFF.SentenceSymbol 0) (WFF.SentenceSymbol 0)
+theorem WFF.length_five {n : Nat} (hn : 0 < n) : ∃ (w : WFF n), w.length = 5 := by
+  exists WFF.BinOp BinOp.And (WFF.SentenceSymbol ⟨0, hn⟩) (WFF.SentenceSymbol ⟨0, hn⟩)
 
-theorem WFF.length_not_six (w : WFF) : w.length ≠ 6 := by
+theorem WFF.length_not_six {n : Nat} (w : WFF n) : w.length ≠ 6 := by
   match w with
   | SentenceSymbol _ =>
     rw [length]
@@ -138,53 +138,56 @@ def Nat.threeStepInduction
 
 -- hack to use Nat.threeStepInduction and do not figure out how to impose `le`
 -- restriction on `n`, instead let `omega` figure that out in the next proof
-theorem WFF.after_six' (n : Nat) : ∃ (w : WFF), w.length = 7 + n := by
-  induction n using Nat.threeStepInduction with
-  | H1 => exists WFF.Not (WFF.Not (WFF.SentenceSymbol 0))
-  | H2 => exists WFF.BinOp BinOp.And (WFF.SentenceSymbol 0) (WFF.Not (WFF.SentenceSymbol 0))
-  | H3 => exists WFF.BinOp BinOp.And (WFF.SentenceSymbol 0) (WFF.BinOp BinOp.And (WFF.SentenceSymbol 0) (WFF.SentenceSymbol 0))
+theorem WFF.after_six' {n : Nat} (hn : 0 < n) (k : Nat) : ∃ (w : WFF n), w.length = 7 + k := by
+  induction k using Nat.threeStepInduction with
+  | H1 => exists WFF.Not (WFF.Not (WFF.SentenceSymbol ⟨0, hn⟩))
+  | H2 => exists WFF.BinOp BinOp.And (WFF.SentenceSymbol ⟨0, hn⟩) (WFF.Not (WFF.SentenceSymbol ⟨0, hn⟩))
+  | H3 => exists WFF.BinOp BinOp.And (WFF.SentenceSymbol ⟨0, hn⟩) (WFF.BinOp BinOp.And (WFF.SentenceSymbol ⟨0, hn⟩) (WFF.SentenceSymbol ⟨0, hn⟩))
   | H4 n h1 h2 h3 =>
     have ⟨w, _⟩ := h1;
     exists WFF.Not w
     rw [length]
     omega
 
-theorem WFF.after_six (n : Nat) (h : 6 < n) : ∃ (w : WFF), w.length = n := by
-  let k := n - 7
-  have h' : 7 + k = n := by omega
-  have w := WFF.after_six' k
+theorem WFF.after_six {n : Nat} (hn : 0 < n) (k : Nat) (h : 6 < k) : ∃ (w : WFF n), w.length = k := by
+  let m := k - 7
+  have h' : 7 + m = k := by omega
+  have w := @WFF.after_six' n hn m
   rw [h'] at w
   exact w
 
-theorem WFF.before_six (n : Nat) (h0 : n ≠ 0) (h2 : n ≠ 2) (h3 : n ≠ 3) (h6 : n ≠ 6) (h : n ≤ 6) : ∃ (w : WFF), w.length = n := by
-  match n with
+theorem WFF.before_six {n : Nat} (hn : 0 < n) (k : Nat) (h0 : k ≠ 0) (h2 : k ≠ 2) (h3 : k ≠ 3) (h6 : k ≠ 6) (h : k ≤ 6)
+  : ∃ (w : WFF n), w.length = k := by
+  match k with
   | 0 => omega
-  | 1 => exact WFF.length_one
+  | 1 => exact WFF.length_one hn
   | 2 => omega
   | 3 => omega
-  | 4 => exact WFF.length_four
-  | 5 => exact WFF.length_five
+  | 4 => exact WFF.length_four hn
+  | 5 => exact WFF.length_five hn
   | 6 => omega
 
-theorem WFF.section1_exercise2 (n : Nat) (h0 : n ≠ 0) (h2 : n ≠ 2) (h3 : n ≠ 3) (h6 : n ≠ 6) : ∃ (w : WFF), w.length = n := by
-  apply @by_cases (n ≤ 6) _ ?_ ?_
+theorem WFF.section1_exercise2 {n : Nat} (hn : 0 < n) (k : Nat) (h0 : k ≠ 0) (h2 : k ≠ 2) (h3 : k ≠ 3) (h6 : k ≠ 6)
+  : ∃ (w : WFF n), w.length = k := by
+  apply @by_cases (k ≤ 6) _ ?_ ?_
   . intro h
-    exact WFF.before_six n h0 h2 h3 h6 h
+    exact WFF.before_six hn k h0 h2 h3 h6 h
   . intro h
-    refine WFF.after_six n ?h'
+    refine WFF.after_six hn k ?h'
     exact Nat.gt_of_not_le h
 
-def WFF.numberOfBinaryConnectives : WFF → Nat
+def WFF.numberOfBinaryConnectives {n : Nat} : WFF n → Nat
   | WFF.SentenceSymbol _ => 0
   | WFF.Not α => α.numberOfBinaryConnectives
   | WFF.BinOp _ α β => 1 + α.numberOfBinaryConnectives + β.numberOfBinaryConnectives
 
-def WFF.numberOfSentenceSymbols : WFF → Nat
+def WFF.numberOfSentenceSymbols {n : Nat} : WFF n → Nat
   | WFF.SentenceSymbol _ => 1
   | WFF.Not α => α.numberOfSentenceSymbols
   | WFF.BinOp _ α β => α.numberOfSentenceSymbols + β.numberOfSentenceSymbols
 
-theorem WFF.section1_exercise3 (w : WFF) : w.numberOfSentenceSymbols = w.numberOfBinaryConnectives + 1 := by
+theorem WFF.section1_exercise3 {n : Nat} (w : WFF n)
+  : w.numberOfSentenceSymbols = w.numberOfBinaryConnectives + 1 := by
   induction w with
   | SentenceSymbol _ =>
     rw [WFF.numberOfBinaryConnectives, WFF.numberOfSentenceSymbols]
@@ -195,12 +198,12 @@ theorem WFF.section1_exercise3 (w : WFF) : w.numberOfSentenceSymbols = w.numberO
     rw [WFF.numberOfBinaryConnectives, WFF.numberOfSentenceSymbols]
     omega
 
-def WFF.hasNoNegationB : WFF → Bool
+def WFF.hasNoNegationB {n : Nat} : WFF n → Bool
   | WFF.SentenceSymbol _ => true
   | WFF.Not _ => false
   | WFF.BinOp _ α β => α.hasNoNegationB && β.hasNoNegationB
 
-def WFF.hasNoNegation (w : WFF) : Prop := w.hasNoNegationB = true
+def WFF.hasNoNegation {n : Nat} (w : WFF n) : Prop := w.hasNoNegationB = true
 
 def and_left : ((a && b) = true) → (a = true) := by
   intro h
@@ -217,19 +220,19 @@ def and_right : ((a && b) = true) → (b = true) := by
   rw [Bool.and_comm] at h
   exact and_left h
 
-def WFF.BinOp_hasNoNegation {α β : WFF} (h : (WFF.BinOp op α β).hasNoNegation)
+def WFF.BinOp_hasNoNegation {n : Nat} {α β : WFF n} (h : (WFF.BinOp op α β).hasNoNegation)
   : α.hasNoNegation ∧ β.hasNoNegation := by
   rw [hasNoNegation, hasNoNegationB] at h
   have hα := and_left h
   have hβ := and_right h
   exact { left := hα, right := hβ }
 
-def WFF.Not_hasNoNegation {α : WFF} (h : (WFF.Not α).hasNoNegation) : False := by
+def WFF.Not_hasNoNegation {n : Nat} {α : WFF n} (h : (WFF.Not α).hasNoNegation) : False := by
   rw [hasNoNegation, hasNoNegationB] at h
   absurd h
   simp
 
-theorem WFF.length_if_hasNoNegation (w : WFF) (h : w.hasNoNegation) : ∃ k, w.length = 4 * k + 1 := by
+theorem WFF.length_if_hasNoNegation {n : Nat} (w : WFF n) (h : w.hasNoNegation) : ∃ k, w.length = 4 * k + 1 := by
   induction w with
   | SentenceSymbol _ =>
     rw [length]
@@ -247,14 +250,14 @@ theorem WFF.length_if_hasNoNegation (w : WFF) (h : w.hasNoNegation) : ∃ k, w.l
     exists kα + kβ + 1
     omega
 
-theorem WFF.section1_exercise5a (w : WFF) (h : w.hasNoNegation) : Odd (w.length) := by
+theorem WFF.section1_exercise5a {n : Nat} (w : WFF n) (h : w.hasNoNegation)
+  : Odd (w.length) := by
   have ⟨l, hl⟩ := WFF.length_if_hasNoNegation w h
   rw [hl]
   exists 2 * l
   omega
 
-theorem WFF.section1_exercise5b
-  {k : Nat} (w : WFF) (h_neg : w.hasNoNegation) (h_len : w.length = 4 * k + 1)
+theorem WFF.section1_exercise5b {n : Nat} {k : Nat} (w : WFF n) (h_neg : w.hasNoNegation) (h_len : w.length = 4 * k + 1)
   : w.numberOfSentenceSymbols = k + 1 := by
   induction w generalizing k with
   | SentenceSymbol _ =>
