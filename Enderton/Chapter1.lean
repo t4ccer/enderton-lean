@@ -1,5 +1,9 @@
 import Mathlib.Data.Nat.Defs
 import Mathlib.Algebra.Parity
+import Mathlib.Data.Nat.Parity
+import Mathlib.Data.Set.Basic
+import Mathlib.Data.Vector
+import Mathlib.Data.Vector.Snoc
 
 inductive BinOp where
   | And
@@ -288,6 +292,199 @@ def WFF.eval {n : Nat} (w : WFF n) (v : Fin n → Bool) : Bool :=
   | WFF.BinOp BinOp.Impl α β => !((WFF.eval α v) && !(WFF.eval β v))
   | WFF.BinOp BinOp.Iff α β => (WFF.eval α v) == (WFF.eval β v)
 
+def truthAssignment (n : Nat) : Type := Fin n → Bool
+
+def truthAssignment.satisfies {n : Nat} (v : truthAssignment n) (w : WFF n) : Prop :=
+  w.eval v = true
+
+def tautologicallyImplies {n : Nat} (σ : Set (WFF n)) (τ : WFF n) : Prop :=
+  ∀ (v : truthAssignment n), v ∈ { v | ∀ (u : WFF n), u ∈ σ → v.satisfies u } → v.satisfies τ
+
+infix:50 " ⊨ " => tautologicallyImplies
+
+def WFF.isTautology {n : Nat} (w : WFF n) : Prop := {} ⊨ w
+
+prefix:75 "⊨" => WFF.isTautology
+
+theorem WFF.self_implies_self {n : Nat} (w : WFF n) : {w} ⊨ w := by
+  rw [tautologicallyImplies]
+  intros _v hv
+  exact hv w rfl
+
+theorem WFF.a_or_not_a_is_tautology :
+  ⊨(@WFF.BinOp 1 BinOp.Or (WFF.SentenceSymbol 0) (WFF.Not (WFF.SentenceSymbol 0))) := by
+  rw[isTautology, tautologicallyImplies]
+  intros v _hv
+  rw [truthAssignment.satisfies]
+  repeat rw [eval]
+  exact Bool.or_not_self (v 0)
+
+def truthAssignment.fromVector {n : Nat} : Vector Bool n → truthAssignment n :=
+  fun v i => v.get i
+
+def boolProduct : (n : Nat) → List (Vector Bool n)
+  | Nat.zero => [] -- garbage in, garbage out, every (finite) WFF has n > 0 anyway
+  | Nat.succ Nat.zero =>
+      [(Vector.cons false Vector.nil), (Vector.cons true Vector.nil)]
+  | Nat.succ m =>
+      (boolProduct m).map (Vector.cons false) ++
+      (boolProduct m).map (Vector.cons true)
+
+theorem Vector.length_one_cons (vs : Vector α 1) : vs.tail = Vector.nil := by
+  have ⟨ls, hl⟩ := vs
+  match ls with
+  | List.cons y List.nil => rfl
+
+theorem in_boolProduct {n : Nat} (hn : 0 < n) (xs : Vector Bool n) :
+  xs ∈ boolProduct n := by
+  induction n, hn using Nat.le_induction with
+  | base =>
+    rw [boolProduct]
+    have length_one_cons_bool : ∃ (b : Bool), xs = Vector.cons b Vector.nil := by
+      exists xs.head
+      rw [<-Vector.cons_head_tail xs, Vector.length_one_cons]
+      rfl
+    simp
+    have ⟨b, hb⟩ := length_one_cons_bool
+    rw [hb]
+    apply @by_cases (b = true) _ ?_ ?_
+    . intro h
+      apply Or.inr
+      rw [h]
+    . intro h
+      simp at h
+      apply Or.inl
+      rw [h]
+  | succ n hn ih =>
+    rw [boolProduct]
+    . simp[*]
+      refine exists_or.mp ?succ.a
+      rw [<-Vector.cons_head_tail xs]
+      exists Vector.tail xs
+      apply @by_cases (Vector.head xs = true) _ ?_ ?_
+      . intro h
+        simp[h]
+      . intro h
+        simp[h]
+    . intro hn0
+      rw [hn0] at hn
+      absurd hn
+      simp
+
+def truthAssignment.prev : truthAssignment (n + 1) → truthAssignment n :=
+  fun old var => old var
+
+theorem Vector.get_snoc_last (n : Nat) (xs : Vector α n) (x : α)
+  : Vector.get (Vector.snoc xs x) ⟨n, lt_add_one n⟩ = x := by
+  induction xs using Vector.inductionOn generalizing x with
+  | h_nil => simp
+  | h_cons ih => exact ih x
+
+theorem Fin.not_eq (i : Fin (n + 1)) (hi : i.val ≠ n) : i.val < n := by
+  omega
+
+theorem Vector.get_cons_nat_succ {n : Nat} (i : Nat) (x : α) (xs : Vector α n) (h : i < n)
+  : Vector.get (Vector.cons x xs) ⟨Nat.succ i, Nat.succ_lt_succ h⟩ = Vector.get xs ⟨i, h⟩ := by
+  exact rfl
+
+theorem Vector.get_snoc_not_last (n : Nat) (xs : Vector α n) (x : α) (i : Fin (n + 1)) (hi: i.val ≠ n)
+  : Vector.get (Vector.snoc xs x) i = Vector.get xs ⟨i.val, Fin.not_eq i hi⟩ := by
+  induction xs using Vector.inductionOn generalizing x with
+  | h_nil => omega
+  | @h_cons m y ys ih =>
+    simp
+    have ⟨k, hk⟩ := i
+    match k with
+    | Nat.zero => simp
+    | Nat.succ z =>
+      simp
+      rw [Vector.get_cons_nat_succ, Vector.get_cons_nat_succ]
+      . rw [ih]
+        . simp at hi
+          exact hi
+        . omega
+
+theorem truthAssignment.exists_bool_vector {n : Nat} (hn : 0 < n) (v : truthAssignment n) :
+  ∃ (bs : Vector Bool n), v = truthAssignment.fromVector bs := by
+  induction n, hn using Nat.le_induction with
+  | base =>
+    exists Vector.cons (v 0) Vector.nil
+    apply funext
+    intro var
+    match var with
+    | 0 => simp [truthAssignment.fromVector]
+  | succ m _hm ih =>
+    have ⟨xs, h_xs⟩ := ih v.prev
+    exists Vector.snoc xs (v m)
+    simp
+    apply funext
+    intro var
+    rw [truthAssignment.fromVector]
+    apply @by_cases (var.val = m) _ ?_ ?_
+    . intro h_var
+      have is_last := Vector.get_snoc_last m xs (v (Fin.last m))
+      have helper : var = ⟨m, by simp⟩ := Fin.val_inj.mp h_var
+      rw [helper, is_last]
+      rfl
+    . intro h_var
+      rw [Vector.get_snoc_not_last m xs (v (Fin.last m)) var h_var]
+      rw [<-truthAssignment.fromVector, <-h_xs, truthAssignment.prev]
+      simp
+
+theorem Or.elim4 {d e : Prop} (h : a ∨ b ∨ c ∨ d) (ha : a → e) (hb : b → e) (hc : c → e) (hd : d → e) : e :=
+  Or.elim h ha fun h ↦ Or.elim h hb fun h ↦ Or.elim h hc hd
+
+theorem example_page23 :
+  { @WFF.SentenceSymbol 2 0, WFF.BinOp BinOp.Impl (WFF.SentenceSymbol 0) (WFF.SentenceSymbol 1) } ⊨ WFF.SentenceSymbol 1 := by
+  rw [tautologicallyImplies]
+  intros v hv
+  have ⟨bs, h_bs⟩ := truthAssignment.exists_bool_vector (by simp) v
+  have bs_in_product := in_boolProduct (by simp) bs
+  rw [h_bs] at hv
+  rw [h_bs]
+  simp [boolProduct, List.map] at bs_in_product
+  -- from here we have our function as a disjunction of possible bool assignments
+  apply Or.elim4 bs_in_product
+  . intro hbv
+    simp[truthAssignment.satisfies, truthAssignment.fromVector, WFF.eval, hbv] at hv
+
+  . intro hbv
+    simp[truthAssignment.satisfies, truthAssignment.fromVector, WFF.eval, hbv] at hv
+
+  . intro hbv
+    simp[truthAssignment.satisfies, truthAssignment.fromVector, WFF.eval, hbv] at hv
+    absurd hv -- somehow lean cannot spot contradiction here like in 2 previous cases
+    simp
+    rfl
+
+  . intro hbv
+    simp[truthAssignment.satisfies, truthAssignment.fromVector, WFF.eval, hbv]
+    rfl
+
+set_option linter.deprecated false in
+theorem WFF.section2_exercise1a : ¬({ @WFF.BinOp 3 BinOp.Iff (WFF.SentenceSymbol 0) (WFF.BinOp BinOp.Iff (WFF.SentenceSymbol 1) (WFF.SentenceSymbol 2)) }
+  ⊨ WFF.BinOp BinOp.Or (WFF.BinOp BinOp.And (WFF.SentenceSymbol 0) (WFF.BinOp BinOp.And (WFF.SentenceSymbol 1) (WFF.SentenceSymbol 2))) (WFF.BinOp BinOp.And (WFF.Not (WFF.SentenceSymbol 0)) (WFF.BinOp BinOp.And (WFF.Not (WFF.SentenceSymbol 1)) (WFF.Not (WFF.SentenceSymbol 2))))) := by
+  let vb : truthAssignment 3 := truthAssignment.fromVector (Vector.cons false (Vector.cons false (Vector.cons true Vector.nil)))
+
+  intro h
+  simp [tautologicallyImplies] at h
+  absurd h
+  simp
+  exists vb
+  simp [truthAssignment.satisfies, eval, vb, truthAssignment.fromVector, Vector.get, List.nthLe]
+  rfl
+
+set_option linter.deprecated false in
+theorem WFF.section2_exercise1b : ¬({ WFF.BinOp BinOp.Or (WFF.BinOp BinOp.And (WFF.SentenceSymbol 0) (WFF.BinOp BinOp.And (WFF.SentenceSymbol 1) (WFF.SentenceSymbol 2))) (WFF.BinOp BinOp.And (WFF.Not (WFF.SentenceSymbol 0)) (WFF.BinOp BinOp.And (WFF.Not (WFF.SentenceSymbol 1)) (WFF.Not (WFF.SentenceSymbol 2)))) }
+  ⊨ @WFF.BinOp 3 BinOp.Iff (WFF.SentenceSymbol 0) (WFF.BinOp BinOp.Iff (WFF.SentenceSymbol 1) (WFF.SentenceSymbol 2))) := by
+  let vb : truthAssignment 3 := truthAssignment.fromVector (Vector.cons false (Vector.cons false (Vector.cons false Vector.nil)))
+
+  intro h
+  simp [tautologicallyImplies] at h
+  absurd h
+  simp
+  exists vb
+  simp [truthAssignment.satisfies, eval, vb, truthAssignment.fromVector, Vector.get, List.nthLe]
 theorem WFF.section2_exercise6a {n : Nat} (w : WFF n) (v1 : Fin n → Bool) (v2 : Fin n → Bool) (h : ∀ (x : Fin n), v1 x = v2 x)
   : eval w v1 = eval w v2 := by
   induction w with
