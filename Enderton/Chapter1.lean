@@ -485,6 +485,135 @@ theorem WFF.section2_exercise1b : ¬({ WFF.BinOp BinOp.Or (WFF.BinOp BinOp.And (
   simp
   exists vb
   simp [truthAssignment.satisfies, eval, vb, truthAssignment.fromVector, Vector.get, List.nthLe]
+
+theorem WFF.isTautology_to_forall {n : Nat} {w : WFF n} (h : ⊨w) : ∀ (v : truthAssignment n), v.satisfies w := by
+  simp [isTautology, tautologicallyImplies] at h
+  exact h
+
+def WFF.section2_exercise2_σ : Nat → WFF 2
+  | Nat.zero => WFF.BinOp BinOp.Impl (WFF.SentenceSymbol 0) (WFF.SentenceSymbol 1)
+  | Nat.succ n => WFF.BinOp BinOp.Impl (WFF.section2_exercise2_σ n) (WFF.SentenceSymbol 0)
+
+theorem WFF.section2_exercise2a : ⊨(WFF.section2_exercise2_σ 2) := by
+  rw [section2_exercise2_σ, isTautology, tautologicallyImplies]
+  intros v hv
+  simp [truthAssignment.satisfies, eval, section2_exercise2_σ]
+
+  have ⟨bs, h_bs⟩ := truthAssignment.exists_bool_vector (by simp) v
+  have bs_in_product := in_boolProduct (by simp) bs
+  rw [h_bs] at hv
+  rw [h_bs]
+  simp [boolProduct, List.map] at bs_in_product
+
+  apply Or.elim4 bs_in_product
+  . intro h
+    simp[truthAssignment.satisfies, truthAssignment.fromVector, WFF.eval, h]
+  . intro h
+    simp[truthAssignment.satisfies, truthAssignment.fromVector, WFF.eval, h]
+  . intro h
+    simp[truthAssignment.satisfies, truthAssignment.fromVector, WFF.eval, h]
+  . intro h
+    simp[truthAssignment.satisfies, truthAssignment.fromVector, WFF.eval, h]
+
+theorem WFF.section2_exercise2_σ_0 : ¬(⊨(WFF.section2_exercise2_σ 0)) := by
+  rw [section2_exercise2_σ, isTautology, tautologicallyImplies]
+  simp [truthAssignment.satisfies, eval, section2_exercise2_σ]
+  exists truthAssignment.fromVector (Vector.cons true (Vector.cons false Vector.nil))
+
+theorem WFF.section2_exercise2_σ_1 : ¬(⊨(WFF.section2_exercise2_σ 1)) := by
+  rw [section2_exercise2_σ, isTautology, tautologicallyImplies]
+  simp [truthAssignment.satisfies, eval, section2_exercise2_σ]
+  exists truthAssignment.fromVector (Vector.cons false (Vector.cons false Vector.nil))
+
+theorem Even.succ_succ : Even (Nat.succ (Nat.succ n)) ↔ Even n := by
+  apply Iff.intro
+  . intro h
+    have ⟨m, hm⟩ := h
+    exists m - 1
+    omega
+  . intro h
+    have ⟨m, hm⟩ := h
+    exists m + 1
+    omega
+
+theorem Odd.succ_succ : Odd (Nat.succ (Nat.succ n)) ↔ Odd n := by
+  apply Iff.intro
+  . intro h
+    have ⟨m, hm⟩ := h
+    exists m - 1
+    omega
+  . intro h
+    have ⟨m, hm⟩ := h
+    exists m + 1
+    omega
+
+theorem WFF.section2_exercise2b_evenAux (h_even : Even n) : ⊨(WFF.section2_exercise2_σ (n + 2)) := by
+  induction n using Nat.twoStepInduction with
+  | H1 =>
+    exact WFF.section2_exercise2a
+  | H2 =>
+    absurd h_even
+    exact Nat.not_even_one
+  | H3 n ih1 _ih2 =>
+    rw [section2_exercise2_σ, section2_exercise2_σ, isTautology, tautologicallyImplies]
+    intro v _hv
+    simp only [truthAssignment.satisfies]
+    rw [eval, eval, eval]
+    have prev_h := WFF.isTautology_to_forall (ih1 ?_)
+    . rw [prev_h, eval]
+      simp
+    . exact Even.succ_succ.mp h_even
+
+theorem WFF.section2_exercise2b_even (h_even : Even n) (h_from_two : 1 < n)
+  : ⊨(WFF.section2_exercise2_σ n) := by
+  let k := n - 2
+  have h := @WFF.section2_exercise2b_evenAux k ?k_even
+  . have nkh : n = k + 2 := by omega
+    rw [nkh]
+    exact h
+  . have hkn : k + 2 = n := by omega
+    rw [<-hkn] at h_even
+    exact Even.succ_succ.mp h_even
+
+theorem WFF.section2_exercise2b_oddAux (h_odd : Odd n) : eval (section2_exercise2_σ n) (truthAssignment.fromVector (false ::ᵥ false ::ᵥ Vector.nil)) = false := by
+    induction n using Nat.twoStepInduction with
+  | H1 =>
+    absurd h_odd
+    simp
+  | H2 =>
+    rw [section2_exercise2_σ]
+    simp [truthAssignment.satisfies, eval, section2_exercise2_σ, truthAssignment.fromVector]
+  | H3 n ih1 _ih2 =>
+    simp [section2_exercise2_σ, eval, truthAssignment.fromVector]
+    apply ih1
+    exact Odd.succ_succ.mp h_odd
+
+theorem WFF.section2_exercise2b_odd (h_odd : Odd n) : ¬(⊨(WFF.section2_exercise2_σ n)) := by
+  rw[isTautology, tautologicallyImplies]
+  simp
+  exists truthAssignment.fromVector (Vector.cons false (Vector.cons false Vector.nil))
+  rw [truthAssignment.satisfies]
+  rw[WFF.section2_exercise2b_oddAux h_odd]
+  simp
+
+theorem WFF.section2_exercise2b : ⊨(WFF.section2_exercise2_σ n) ↔ (Even n ∧ 1 < n) := by
+  apply Iff.intro
+  . contrapose
+    intro h
+    rw [not_and_or] at h
+    apply Or.elim h
+    . intro h_not_even
+      have h_odd : Odd n := by exact Nat.odd_iff_not_even.mpr h_not_even
+      exact WFF.section2_exercise2b_odd h_odd
+    . intro h_lt
+      simp at h_lt
+      match n with
+      | 0 => exact WFF.section2_exercise2_σ_0
+      | 1 => exact WFF.section2_exercise2_σ_1
+  . intros hs
+    have ⟨h_even, h_from_two⟩ := hs
+    exact WFF.section2_exercise2b_even h_even h_from_two
+
 theorem WFF.section2_exercise6a {n : Nat} (w : WFF n) (v1 : Fin n → Bool) (v2 : Fin n → Bool) (h : ∀ (x : Fin n), v1 x = v2 x)
   : eval w v1 = eval w v2 := by
   induction w with
